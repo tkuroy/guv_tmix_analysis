@@ -1,3 +1,104 @@
+"""
+Sigmoid fitting and Tmix shift analysis for vesicle phase-separation data
+=========================================================================
+
+WHAT THE SCRIPT DOES
+--------------------
+This script fits a sigmoid curve to each input CSV file to estimate the
+miscibility transition temperature (Tmix). It then calculates the shift
+in Tmix at each concentration difference (Delta c), relative to the
+Delta c = 0 mM measurement from the same date, and writes the results
+to a summary CSV file.
+
+HOW TO RUN
+----------
+Run the script and select the folder containing the input CSV files in
+the folder-selection dialog. The script scans the selected folder for
+CSV files and saves the summary file in that same folder.
+
+INPUT CSV FILES
+---------------
+Each input CSV file must contain these columns:
+
+    T       Temperature
+    Mixed   Number of vesicles without visible phase-separated domains
+    Sep     Number of vesicles with visible phase-separated domains
+
+For each row, the fraction of vesicles with domains is calculated as:
+
+    fraction (%) = Sep / (Mixed + Sep) * 100
+
+Rows with missing or non-finite temperature or fraction values are
+excluded from the fit. At least four valid data points are required.
+
+INPUT FILE NAMES
+----------------
+The filename must begin with a four-digit month/day code, such as
+0406 for April 6, and contain a concentration label such as:
+
+    diff0mM
+    diff20mM
+    diff-12.5mM
+
+Files without a readable date or Delta c value are skipped.
+
+SIGMOID FIT
+-----------
+The fitted model is:
+
+    y(T) = y0 * (1 - 1 / (1 + exp(-(T - Tmix) / w)))
+
+where Tmix is the midpoint of the transition, w is the sigmoid width,
+and y0 is the maximum fitted fraction of vesicles with domains.
+
+The initial parameter values are:
+
+    Tmix = tmixguess
+    w    = 0.5 °C
+    y0   = 100 %
+
+tmixguess is an initial estimate supplied to the fitting algorithm. It
+helps the optimizer choose where to start searching; it does not fix or
+constrain the final fitted Tmix. Change tmixguess if the fit does not
+converge reliably for your data.
+
+The fit uses all valid data points in each CSV file. The parameter
+bounds are: w >= 0 and 0 <= y0 <= 100.
+
+UNCERTAINTY AND BASELINE
+------------------------
+The 95% confidence-interval half-width for each fitted Tmix is estimated
+from the parameter covariance matrix returned by scipy.optimize.curve_fit
+and a Student's t distribution, using the residual degrees of freedom.
+
+For each date, the script uses the fitted Delta c = 0 mM file(s) as the
+baseline. If there is more than one baseline file for a date, their Tmix
+estimates are averaged and the baseline confidence interval is calculated
+from their standard errors using the Welch-Satterthwaite approximation.
+
+The Tmix shift is calculated as:
+
+    Delta Tmix = Tmix at the selected Delta c - baseline Tmix
+
+For nonzero Delta c, the two 95% confidence-interval half-widths are
+combined in quadrature. For Delta c = 0 mM, the shift is set to zero and
+the baseline confidence-interval half-width is reported.
+
+OUTPUT
+------
+The script writes one summary file to the selected folder:
+
+    <folder_name>_95%.csv
+
+The output includes Delta c, date, baseline Tmix and confidence interval,
+Tmix at each Delta c, the Tmix shift, and the combined confidence-interval
+half-width.
+
+DEPENDENCIES
+------------
+Python packages: numpy, pandas, scipy
+"""
+
 import re
 from pathlib import Path
 from tkinter import Tk, filedialog
